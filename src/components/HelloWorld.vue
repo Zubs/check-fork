@@ -1,75 +1,120 @@
 <template>
-  <v-container class="fill-height">
-    <v-responsive class="align-center text-center fill-height">
-      <v-img height="300" src="@/assets/logo.svg" />
+  <v-card
+    class="mx-auto mt-12"
+    elevation="1"
+    max-width="75%"
+    :loading="loading"
+  >
+    <v-card-title class="py-5 font-weight-black">Find your forks easily</v-card-title>
 
-      <div class="text-body-2 font-weight-light mb-n1">Welcome to</div>
+    <v-card-text>
+      To find a fork, simply paste the url of the original Github repository here.
+    </v-card-text>
 
-      <h1 class="text-h2 font-weight-bold">Vuetify</h1>
+    <v-card-text>
+      <div class="text-subtitle-2 font-weight-black mb-1">GitHub URL</div>
 
-      <div class="py-14" />
+      <v-form @submit.prevent="search">
+        <v-text-field
+          label="https://github.com/username/repo"
+          single-line
+          variant="outlined"
+          v-model="url"
+          required
+          clearable
+          :rules="urlRules"
+        ></v-text-field>
 
-      <v-row class="d-flex align-center justify-center">
-        <v-col cols="auto">
-          <v-btn
-            href="https://vuetifyjs.com/components/all/"
-            min-width="164"
-            rel="noopener noreferrer"
-            target="_blank"
-            variant="text"
-          >
-            <v-icon
-              icon="mdi-view-dashboard"
-              size="large"
-              start
-            />
+        <template v-if="errorMessage">
+          <v-alert
+            density="compact"
+            type="error"
+            title="Error Fetching Forks"
+            :text="errorMessage"
+          ></v-alert>
+        </template>
 
-            Components
-          </v-btn>
-        </v-col>
+        <v-btn
+          :disabled="loading"
+          :loading="loading"
+          block
+          class="text-none mb-4 mt-4"
+          color="indigo-darken-3"
+          size="x-large"
+          variant="flat"
+          prepend-icon="mdi-magnify"
+          type="submit"
+        >
+          Search
+        </v-btn>
+      </v-form>
 
-        <v-col cols="auto">
-          <v-btn
-            color="primary"
-            href="https://vuetifyjs.com/introduction/why-vuetify/#feature-guides"
-            min-width="228"
-            rel="noopener noreferrer"
-            size="x-large"
-            target="_blank"
-            variant="flat"
-          >
-            <v-icon
-              icon="mdi-speedometer"
-              size="large"
-              start
-            />
+      <v-list v-if="forks.length" lines="two">
+        <v-list-subheader inset>Forks: {{ forks.length }} of {{ totalCount }}</v-list-subheader>
 
-            Get Started
-          </v-btn>
-        </v-col>
+        <v-list-item
+          v-for="fork in forks"
+          :key="fork.url"
+          :title="fork.url.split('/').slice(-2).join('/')"
+          :subtitle="'Last Updated At: ' + new Date(fork.updatedAt).toString().split(' ').slice(0, 4).join(' ')"
+        >
+          <template v-slot:prepend>
+            <v-avatar :color="pink">
+              <v-icon icon="mdi-github"></v-icon>
+            </v-avatar>
+          </template>
 
-        <v-col cols="auto">
-          <v-btn
-            href="https://community.vuetifyjs.com/"
-            min-width="164"
-            rel="noopener noreferrer"
-            target="_blank"
-            variant="text"
-          >
-            <v-icon
-              icon="mdi-account-group"
-              size="large"
-              start
-            />
-
-            Community
-          </v-btn>
-        </v-col>
-      </v-row>
-    </v-responsive>
-  </v-container>
+          <template v-slot:append>
+            {{ fork.stargazerCount }}
+            <v-btn
+              color="grey-lighten-1"
+              icon="mdi-star"
+              variant="text"
+            ></v-btn>
+          </template>
+        </v-list-item>
+      </v-list>
+    </v-card-text>
+  </v-card>
 </template>
 
-<script lang="ts" setup>
-  //
+<script>
+export default {
+  data: () => ({
+    loading: false,
+    url: '',
+    urlRules: [
+      v => !!v || 'URL is required',
+      v => /^https:\/\/github.com\/[a-z0-9-]+\/[a-z0-9-]+$/i.test(v) || 'URL must be a valid GitHub repository',
+    ],
+    forks: [],
+    totalCount: null,
+    errorMessage: null,
+  }),
+
+  methods: {
+    async search () {
+      if (!this.url) return;
+
+      this.loading = true;
+      this.forks = [];
+      this.totalCount = null;
+      this.errorMessage = null;
+
+      const data = await fetch('https://check-forks-f94a762b1338.herokuapp.com/search', {
+        method: 'POST',
+        body: JSON.stringify({ github_url: this.url }),
+      }).then(res => res.json());
+
+      if (data && data.success) {
+        this.loading = false;
+        this.forks = data.data.stars.data.repository.forks.nodes;
+        this.totalCount = data.data.date.data.repository.forks.totalCount;
+      } else {
+        this.loading = false;
+        this.errorMessage = data.message;
+      }
+    }
+  },
+}
 </script>
